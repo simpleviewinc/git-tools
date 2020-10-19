@@ -13,6 +13,9 @@ async function run() {
 
 	// const state = await gitTools.getState("/app/src/cms-client-base");
 	// console.log('state', state);
+
+	const result = await gitTools.getBranches("/app/testing/checkout");
+	console.log("result", result);
 }
 
 run();

@@ -44,8 +44,8 @@ async function checkout({
 		return execP(command, { cwd : path });
 	}
 
-	function spawnPath(command) {
-		return spawnP(command, { ...options, cwd : path });
+	function spawnPath(command, myOptions = {}) {
+		return spawnP(command, { ...options, ...myOptions, cwd : path });
 	}
 
 	let exists;
@@ -90,10 +90,21 @@ async function checkout({
 			await execPath(`git show-ref "refs/heads/${desiredLocalBranch}"`);
 		} catch(e) {
 			// branch doesn't exist, add it
-			await spawnPath(`git branch "${desiredLocalBranch}" --track "${desiredRemoteBranch}"`);
+			await spawnPath(`git branch $LOCAL_BRANCH --track $REMOTE_BRANCH`, {
+				env : {
+					...process.env,
+					LOCAL_BRANCH : desiredLocalBranch,
+					REMOTE_BRANCH : desiredRemoteBranch
+				}
+			});
 		}
 		
-		await spawnPath(`git checkout "${desiredLocalBranch}"`);
+		await spawnPath(`git checkout $LOCAL_BRANCH`, {
+			env : {
+				...process.env,
+				LOCAL_BRANCH : desiredLocalBranch
+			}
+		});
 	}
 
 	await spawnPath(`git pull`);
@@ -157,8 +168,32 @@ async function assertIsGit(path) {
 	}
 }
 
+async function getBranch(path) {
+	assertIsGit(path);
+
+	const branch = (await execP(`git rev-parse --abbrev-ref HEAD`, { cwd : path })).stdout.trim();
+	return branch;
+}
+
+async function getBranches(path) {
+	assertIsGit(path);
+
+	const branches = (await execP(`git for-each-ref --format='%(objectname):%(refname:short):%(upstream:short)' refs/heads`, { cwd : path })).stdout.trim();
+	const lines = branches.split("\n");
+	return lines.map(val => {
+		const parts = val.split(":");
+		return {
+			commit : parts[0],
+			name : parts[1],
+			tracking : parts[2]
+		}
+	});
+}
+
 exports.assertIsGit = assertIsGit;
 exports.checkout = checkout;
+exports.getBranch = getBranch;
+exports.getBranches = getBranches;
 exports.getState = getState;
 exports.getTrackingBranch = getTrackingBranch;
 exports.isGitRepo = isGitRepo;

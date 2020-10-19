@@ -9,10 +9,13 @@
 		"url": "git+https://github.com/simpleviewinc/git-tools.git"
 	},
 	"scripts": {
-		"docker": "./dev/build && ./dev/run || true"
+		"docker": "./dev/build && ./dev/run || true",
+		"test": "mocha ./testing/*.test.js"
 	},
 	"devDependencies": {
-		"mocha": "8.1.3"
+		"mocha": "8.1.3",
+		"@simpleview/mochalib": "1.0.2",
+		"@simpleview/assertlib": "1.2.0"
 	},
 	"author": "owenallenaz@gmail.com",
 	"license": "ISC",
