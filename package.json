@@ -10,7 +10,8 @@
 	},
 	"scripts": {
 		"docker": "./dev/build && ./dev/run || true",
-		"test": "mocha ./testing/*.test.js"
+		"test": "mocha ./testing/*.test.js",
+		"publish": "./dev/publish"
 	},
 	"devDependencies": {
 		"mocha": "8.1.3",
