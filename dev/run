@@ -1,0 +1,8 @@
+#!/bin/bash
+docker run -it \
+	-v $PWD/src:/app/src \
+	-v $PWD/testing:/app/testing \
+	-v $PWD/package.json:/app/package.json \
+	-v /root/github_key:/root/github_key \
+	-v /root/.ssh/config:/root/.ssh/config \
+	git-tools:local /bin/bash
