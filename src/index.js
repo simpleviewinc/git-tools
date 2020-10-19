@@ -168,6 +168,10 @@ async function assertIsGit(path) {
 	}
 }
 
+/**
+ * Returns the current branch name for the git repository.
+ * @param {string} path - Path to git repo without trailing /.
+ */
 async function getBranch(path) {
 	assertIsGit(path);
 
@@ -175,6 +179,10 @@ async function getBranch(path) {
 	return branch;
 }
 
+/**
+ * Returns the commit, name, tracking of all branches on the git repository.
+ * @param {string} path - Path to git repo without trailing /.
+*/
 async function getBranches(path) {
 	assertIsGit(path);
 
