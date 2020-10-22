@@ -110,6 +110,14 @@ describe(__filename, function() {
 			const branches = await gitTools.getBranches(test.checkoutArgs.path);
 			assertLib.deepCheck(branches, test.branches);
 		});
+
+		it("should checkout with special characters and switch off it", async function() {
+			this.timeout(10000);
+
+			await gitTools.checkout({ origin : testOrigin, path : checkoutFolder, silent : true, branch : `with-special-chars-,'"!@#$_` });
+
+			await gitTools.checkout({ origin : testOrigin, path : checkoutFolder, silent : true });
+		});
 	});
 
 	describe("getState", function() {

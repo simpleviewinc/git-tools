@@ -13,7 +13,7 @@ function spawnP(command, args, options) {
 			if (code === 0) {
 				return resolve();
 			} else {
-				return reject(new Error(`Process failed returned exit ${code}`));
+				return reject(new Error(`Process failed returned exit ${code}. Command ${command}.`));
 			}
 		});
 	});
@@ -40,8 +40,8 @@ async function checkout({
 	const baseOptions = { shell : true };
 	const options = silent ? baseOptions : { ...baseOptions, stdio : "inherit" };
 
-	function execPath(command) {
-		return execP(command, { cwd : path });
+	function execPath(command, myOptions = {}) {
+		return execP(command, { ...myOptions, cwd : path });
 	}
 
 	function spawnPath(command, myOptions = {}) {
@@ -81,13 +81,23 @@ async function checkout({
 
 	if (clean === true) {
 		// clean current branch
-		await spawnPath(`git reset --hard ${currentTracking} && git clean -f`);
+		await spawnPath(`git reset --hard $LOCAL_BRANCH && git clean -f`, {
+			env : {
+				...process.env,
+				LOCAL_BRANCH : currentTracking
+			}
+		});
 	}
 
 	if (currentTracking !== desiredTracking) {
 		try {
 			// check if the branch exists already on this repo
-			await execPath(`git show-ref "refs/heads/${desiredLocalBranch}"`);
+			await execPath(`git show-ref $BRANCH`, {
+				env : {
+					...process.env,
+					BRANCH : `refs/heads/${desiredLocalBranch}`
+				}
+			});
 		} catch(e) {
 			// branch doesn't exist, add it
 			await spawnPath(`git branch $LOCAL_BRANCH --track $REMOTE_BRANCH`, {
