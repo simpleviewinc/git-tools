@@ -92,6 +92,24 @@ describe(__filename, function() {
 						}
 					]
 				}
+			},
+			{
+				name : "checkout with github flag",
+				args : {
+					checkoutArgs : { origin : testOrigin, path : checkoutFolder, silent : true, github : "owenallenaz:develop" },
+					branch : "owenallenaz-develop",
+					trackingBranch : `owenallenaz/develop`,
+					branches : [
+						{
+							name : "master",
+							tracking : "origin/master"
+						},
+						{
+							name : `owenallenaz-develop`,
+							tracking : `owenallenaz/develop`
+						}
+					]
+				}
 			}
 		];
 

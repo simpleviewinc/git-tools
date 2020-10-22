@@ -26,6 +26,7 @@ function spawnP(command, args, options) {
  * @param {string} args.path - The path without trailing / to checkout the repository.
  * @param {string} [args.branch] - The branch to checkout. Default "master".
  * @param {string} [args.remote] - The remote to reference. Pass if you want to switch to a different fork. Default "origin".
+ * @param {string} [args.github] - remote:branch syntax that github provides with their quick link in the UI.
  * @param {boolean} [args.silent] - Whether to perform the git mechanisms silently or stream to the parent process. Default false.
  * @param {boolean} [args.clean] - Whether to clean-up the working copy prior to pulling in new changes. Default true.
  */
@@ -36,7 +37,18 @@ async function checkout({
 	remote = "origin",
 	silent = false,
 	clean = true,
+	github,
 }) {
+	if (github !== undefined) {
+		const match = github.match(/^(.*?):(.*)$/);
+		if (match === null || match.length !== 3) {
+			throw new Error(`Github flag is invalid, must be in the form copied from github like --github="remote:branch"`);
+		}
+
+		remote = match[1];
+		branch = match[2];
+	}
+
 	const baseOptions = { shell : true };
 	const options = silent ? baseOptions : { ...baseOptions, stdio : "inherit" };
 
