@@ -22,8 +22,9 @@ Checks out a git repsitory using it's ssh URL. You can use this to checkout this
     * path - The path without trailing / where the repo should be checked out to.
     * branch - optional - default 'master' - What branch to checkout.
     * remote - optional - default 'origin' - Specify if you want to checkout a fork of the origin.
+    * github - optional - Specify a github link in format remote/branch, easy copy-pasting from the github UI.
     * silent - optional - default false - Whether or not the git commands should proceed silently or stream their output to the console.
-    * clean - optional - default true - Whether to clean-up the working copy of any uncommitted files and changes.
+    * interactive - optional - default false - Whether to prompt the user before making destructive actions like cleaning or resetting.
 
 ### getBranch(path)
 
@@ -44,3 +45,7 @@ Returns the tracking branch in the format remote/branch-name.
 ### isGitRepo(path)
 
 Returns boolean for whether the path is a git repo.
+
+### isDirty(path)
+
+Returns boolean for whether the path has changes including removals, additions, and untracked changes.

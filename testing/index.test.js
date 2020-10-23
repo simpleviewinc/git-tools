@@ -6,15 +6,18 @@ const child_process = require("child_process");
 
 const gitTools = require("../src");
 
+const checkoutFolder = `/tmp/checkout`;
 const testOrigin = "git@github.com:simpleviewinc/git-tools-test.git";
 
 child_process.execSync(`git config --global user.email "owenallena@gmail.com"`);
 child_process.execSync(`git config --global user.name "Owen Allen"`);
 
+async function checkout(args = {}) {
+	return gitTools.checkout({ origin : testOrigin, path : checkoutFolder, silent : true, ...args });
+}
+
 describe(__filename, function() {
 	this.timeout(5000);
-
-	const checkoutFolder = `/tmp/checkout`;
 
 	const cleanup = async function() {
 		await fs.rmdir(checkoutFolder, { recursive : true })
@@ -136,6 +139,101 @@ describe(__filename, function() {
 
 			await gitTools.checkout({ origin : testOrigin, path : checkoutFolder, silent : true });
 		});
+
+		it("should clean the working copy", async function() {
+			this.timeout(10000);
+
+			await checkout();
+			await fs.writeFile(`${checkoutFolder}/untrackedFile.txt`, "content");
+			await fs.writeFile(`${checkoutFolder}/addedFile.txt`, "content");
+			await fs.access(`${checkoutFolder}/test.txt`);
+
+			child_process.execSync(`git add addedFile.txt && rm test.txt`, { cwd : checkoutFolder });
+			
+			await checkout();
+			
+			await assert.rejects(fs.access(`${checkoutFolder}/untrackedFile.txt`), {
+				name : "Error",
+				message : "ENOENT: no such file or directory, access '/tmp/checkout/untrackedFile.txt'"
+			});
+
+			await assert.rejects(fs.access(`${checkoutFolder}/addedFile.txt`), {
+				name : "Error",
+				message : "ENOENT: no such file or directory, access '/tmp/checkout/addedFile.txt'"
+			});
+
+			await fs.access(`${checkoutFolder}/test.txt`);
+		});
+
+		it("should reset the working copy if ahead", async function() {
+			this.timeout(10000);
+
+			await checkout();
+			await fs.writeFile(`${checkoutFolder}/addedFile.txt`, "content");
+			child_process.execSync(`git add addedFile.txt && git commit -m 'new file'`, { cwd : checkoutFolder });
+
+			await fs.writeFile(`${checkoutFolder}/untrackedFile.txt`, "content");
+
+			const dirty1 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty1, true);
+
+			const state1 = await gitTools.getState(checkoutFolder);
+			assert.strictEqual(state1, "ahead");
+
+			await checkout();
+
+			const dirty2 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty2, false);
+
+			const state2 = await gitTools.getState(checkoutFolder);
+			assert.strictEqual(state2, "equal");
+		});
+
+		it("should checkout interactively", async function() {
+			this.timeout(30000);
+
+			await checkout();
+			await fs.writeFile(`${checkoutFolder}/addedFile.txt`, "content");
+			await fs.writeFile(`${checkoutFolder}/untrackedFile.txt`, "content");
+			child_process.execSync(`git add addedFile.txt && git commit -m 'new change'`, { cwd : checkoutFolder });
+
+			const command = `/app/src/cli checkout --origin=${testOrigin} --path=${checkoutFolder} --interactive --silent`;
+			const child = child_process.spawn(command, { shell : true });
+			const lines = [];
+			child.stdout.on("data", function(d) {
+				const newLines = d.toString().trim().split("\n");
+				lines.push(...newLines);
+
+				if (lines.length === 2) {
+					assert.deepStrictEqual(lines, [
+						"Repository at /tmp/checkout has uncommited changes. It is necessary to have a clean working copy to proceed. This will revert all pending changes.",
+						"Press [enter] to continue and clean your working copy, or ctrl+c to cancel the operation."
+					]);
+					child.stdin.write("\n");
+				} else if (lines.length === 5) {
+					assert.deepStrictEqual(lines.slice(2, 5), [
+						"Repository at /tmp/checkout is currently ahead of the remote fork/branch. To proceed we need to reset to the state of the working copy. This will cause you to lose your additional commits.",
+						"If you do not want to lose your work, then either push your commits to the remote/branch, manually pull or rebase.",
+						"Press [enter] to continue and reset or ctrl+c to cancel the operation."
+					]);
+					child.stdin.write("\n");
+					child.stdin.end();
+				}
+			});
+
+			await new Promise(function(resolve, reject) {
+				child.on("close", function(code) {
+					assert.strictEqual(code, 0);
+					resolve();
+				});
+			});
+
+			const dirty = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty, false);
+
+			const state = await gitTools.getState(checkoutFolder);
+			assert.strictEqual(state, "equal");
+		});
 	});
 
 	describe("getState", function() {
@@ -199,6 +297,44 @@ describe(__filename, function() {
 				assert.strictEqual(err.message, "Repository at /app is not a git repo.");
 				return true;
 			});
+		});
+	});
+
+	describe("isDirty", function() {
+		it("should work", async function() {
+			await gitTools.checkout({
+				origin : testOrigin,
+				path : checkoutFolder,
+				silent : true
+			});
+
+			const dirty1 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty1, false);
+
+			// ensure untracked add triggers dirty
+			await fs.writeFile(`${checkoutFolder}/newFile.txt`, "content");
+			const dirty2 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty2, true);
+
+			// ensure tracked add triggers dirty
+			child_process.execSync("git add newFile.txt", { cwd : checkoutFolder });
+			const dirty3 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty3, true);
+
+			// ensure a commited change removes dirty state
+			child_process.execSync("git commit -m 'new change'", { cwd : checkoutFolder });
+			const dirty4 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty4, false);
+
+			// ensure a normal remove triggers dirty
+			child_process.execSync("rm test.txt", { cwd : checkoutFolder });
+			const dirty5 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty5, true);
+
+			// ensure a tracked remove triggers dirty
+			child_process.execSync("git rm test.txt", { cwd : checkoutFolder });
+			const dirty6 = await gitTools.isDirty(checkoutFolder);
+			assert.strictEqual(dirty6, true);
 		});
 	});
 });

@@ -2,8 +2,10 @@
 const child_process = require("child_process");
 const fs = require("fs").promises;
 const util = require("util");
+const read = require("read");
 
 const execP = util.promisify(child_process.exec);
+const readP = util.promisify(read);
 
 function spawnP(command, args, options) {
 	const child = child_process.spawn(command, args, options);
@@ -28,16 +30,16 @@ function spawnP(command, args, options) {
  * @param {string} [args.remote] - The remote to reference. Pass if you want to switch to a different fork. Default "origin".
  * @param {string} [args.github] - remote:branch syntax that github provides with their quick link in the UI.
  * @param {boolean} [args.silent] - Whether to perform the git mechanisms silently or stream to the parent process. Default false.
- * @param {boolean} [args.clean] - Whether to clean-up the working copy prior to pulling in new changes. Default true.
+ * @param {boolean} [args.interactive] - Prompt the user before destructive changes are made to the working copy. Default false.
  */
 async function checkout({
 	origin,
 	path,
 	branch = "master",
 	remote = "origin",
-	silent = false,
-	clean = true,
 	github,
+	silent = false,
+	interactive = false,
 }) {
 	if (github !== undefined) {
 		const match = github.match(/^(.*?):(.*)$/);
@@ -91,14 +93,15 @@ async function checkout({
 
 	await spawnPath(`git fetch --recurse-submodules ${remote}`);
 
-	if (clean === true) {
-		// clean current branch
-		await spawnPath(`git reset --hard $LOCAL_BRANCH && git clean -f`, {
-			env : {
-				...process.env,
-				LOCAL_BRANCH : currentTracking
-			}
-		});
+	const dirty = await isDirty(path);
+	if (dirty === true) {
+		if (interactive === true) {
+			console.log(`Repository at ${path} has uncommited changes. It is necessary to have a clean working copy to proceed. This will revert all pending changes.`);
+			await readP({ prompt : "Press [enter] to continue and clean your working copy, or ctrl+c to cancel the operation." });
+		}
+
+		// resets tracked files, deletes untracked files, re-adds deleted files
+		await spawnPath(`git reset && git clean -f && git checkout .`);
 	}
 
 	if (currentTracking !== desiredTracking) {
@@ -125,6 +128,22 @@ async function checkout({
 			env : {
 				...process.env,
 				LOCAL_BRANCH : desiredLocalBranch
+			}
+		});
+	}
+
+	const state = await getState(path);
+	if (state === "ahead") {
+		if (interactive === true) {
+			console.log(`Repository at ${path} is currently ahead of the remote fork/branch. To proceed we need to reset to the state of the working copy. This will cause you to lose your additional commits.`);
+			console.log(`If you do not want to lose your work, then either push your commits to the remote/branch, manually pull or rebase.`);
+			await readP({ prompt : "Press [enter] to continue and reset or ctrl+c to cancel the operation."});
+		}
+
+		await spawnPath(`git reset --hard $BRANCH && git clean -f`, {
+			env : {
+				...process.env,
+				BRANCH : desiredTracking
 			}
 		});
 	}
@@ -220,10 +239,21 @@ async function getBranches(path) {
 	});
 }
 
+async function isDirty(path) {
+	const result = await execP(`git status --porcelain`, { cwd : path });
+
+	if (result.stdout === "") {
+		return false;
+	} else {
+		return true;
+	}
+}
+
 exports.assertIsGit = assertIsGit;
 exports.checkout = checkout;
 exports.getBranch = getBranch;
 exports.getBranches = getBranches;
 exports.getState = getState;
 exports.getTrackingBranch = getTrackingBranch;
+exports.isDirty = isDirty;
 exports.isGitRepo = isGitRepo;

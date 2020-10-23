@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+const gitTools = require("./");
+const commandLineArgs = require("command-line-args");
+
+const flags = commandLineArgs([
+	{ name : "method", defaultOption : true }
+], { stopAtFirstUnknown : true });
+
+if (flags.method === "checkout") {
+	const flags = commandLineArgs([
+		{ name : "origin", type : String },
+		{ name : "path", type : String },
+		{ name : "branch", type : String },
+		{ name : "remote", type : String },
+		{ name : "interactive", type : Boolean },
+		{ name : "silent", type : Boolean }
+	], { argv : process.argv.slice(3), stopAtFirstUnknown : true });
+
+	gitTools.checkout(flags);
+}
