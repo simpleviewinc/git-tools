@@ -146,6 +146,8 @@ describe(__filename, function() {
 			await checkout();
 			await fs.writeFile(`${checkoutFolder}/untrackedFile.txt`, "content");
 			await fs.writeFile(`${checkoutFolder}/addedFile.txt`, "content");
+			await fs.mkdir(`${checkoutFolder}/newFolder`);
+			await fs.writeFile(`${checkoutFolder}/newFolder/nestedFile.txt`, "content");
 			await fs.access(`${checkoutFolder}/test.txt`);
 
 			child_process.execSync(`git add addedFile.txt && rm test.txt`, { cwd : checkoutFolder });
@@ -160,6 +162,11 @@ describe(__filename, function() {
 			await assert.rejects(fs.access(`${checkoutFolder}/addedFile.txt`), {
 				name : "Error",
 				message : "ENOENT: no such file or directory, access '/tmp/checkout/addedFile.txt'"
+			});
+
+			await assert.rejects(fs.access(`${checkoutFolder}/newFolder/nestedFile.txt`), {
+				name : "Error",
+				message : "ENOENT: no such file or directory, access '/tmp/checkout/newFolder/nestedFile.txt'"
 			});
 
 			await fs.access(`${checkoutFolder}/test.txt`);

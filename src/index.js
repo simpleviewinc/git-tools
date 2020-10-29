@@ -101,7 +101,7 @@ async function checkout({
 		}
 
 		// resets tracked files, deletes untracked files, re-adds deleted files
-		await spawnPath(`git reset && git clean -f && git checkout .`);
+		await spawnPath(`git reset && git clean -ffd && git checkout .`);
 	}
 
 	if (currentTracking !== desiredTracking) {
