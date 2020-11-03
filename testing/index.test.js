@@ -3,14 +3,13 @@ const assert = require("assert");
 const mochaLib = require("@simpleview/mochalib");
 const assertLib = require("@simpleview/assertlib");
 const child_process = require("child_process");
+const crypto = require("crypto");
 
 const gitTools = require("../src");
+const pathExists = gitTools.pathExists;
 
 const checkoutFolder = `/tmp/checkout`;
 const testOrigin = "git@github.com:simpleviewinc/git-tools-test.git";
-
-child_process.execSync(`git config --global user.email "owenallena@gmail.com"`);
-child_process.execSync(`git config --global user.name "Owen Allen"`);
 
 async function checkout(args = {}) {
 	return gitTools.checkout({ origin : testOrigin, path : checkoutFolder, silent : true, ...args });
@@ -240,6 +239,56 @@ describe(__filename, function() {
 
 			const state = await gitTools.getState(checkoutFolder);
 			assert.strictEqual(state, "equal");
+		});
+
+		describe("submodules", function() {
+			this.timeout(20000);
+
+			it("should checkout including submodules", async function() {
+				// checkout normal
+				await checkout();
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule`), false);
+
+				// checkout with a submodule
+				await checkout({ branch : "submodule-test" });
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule/test.txt`), true);
+
+				// check off the submodule make sure it's gone
+				await checkout();
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule`), false);
+			});
+
+			it("should checkout and switch from submodules with different remotes", async function() {
+				await checkout();
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule`), false);
+
+				await checkout({ branch : "submodule-test" });
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule/test.txt`), true);
+
+				await checkout({ branch : "submodule-test2" });
+				const readmeContent = await fs.readFile(`${checkoutFolder}/submodule/readme.md`);
+				const hash = crypto.createHash("md5").update(readmeContent).digest("hex");
+				assert.strictEqual(hash, "0c36921f42e7d8387eb800f4f463da2e");
+				assert.strictEqual(await pathExists(`${checkoutFolder}/.git/git-tools/modules/submodule-test`), true);
+
+				await checkout();
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule/readme.md`), false);
+				assert.strictEqual(await pathExists(`${checkoutFolder}/.git/git-tools/modules/submodule-test2`), true);
+			});
+
+			it("should preserve branches on submodules", async function() {
+				await checkout({ branch : "submodule-test" });
+				child_process.execSync(`git branch new-branch && git checkout new-branch 2>&1 && touch new.txt && git add new.txt && git commit -m 'test'`, {
+					cwd : `${checkoutFolder}/submodule`
+				});
+				await checkout();
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule/new.txt`), false);
+				await checkout({ branch : "submodule-test" });
+				child_process.execSync(`git checkout new-branch 2>&1`, {
+					cwd : `${checkoutFolder}/submodule`
+				});
+				assert.strictEqual(await pathExists(`${checkoutFolder}/submodule/new.txt`), true);
+			});
 		});
 	});
 

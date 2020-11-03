@@ -41,6 +41,14 @@ async function checkout({
 	silent = false,
 	interactive = false,
 }) {
+	if (path === undefined) {
+		throw new Error(`Must specify a path.`);
+	}
+
+	if (origin === undefined) {
+		throw new Error(`Must specify an origin.`);
+	}
+
 	if (github !== undefined) {
 		const match = github.match(/^(.*?):(.*)$/);
 		if (match === null || match.length !== 3) {
@@ -80,6 +88,7 @@ async function checkout({
 	const name = origin.match(/\/(.*).git/)[1];
 
 	const currentTracking = await getTrackingBranch(path);
+	const currentBranch = await getBranch(path);
 
 	if (remote !== "origin") {
 		try {
@@ -92,7 +101,7 @@ async function checkout({
 	}
 
 	await spawnPath(`git fetch --recurse-submodules ${remote}`);
-
+	
 	const dirty = await isDirty(path);
 	if (dirty === true) {
 		if (interactive === true) {
@@ -101,6 +110,13 @@ async function checkout({
 		}
 
 		// resets tracked files, deletes untracked files, re-adds deleted files
+		if (await hasSubmodules(path) === true) {
+			// cleans all junk from submodules
+			await spawnPath(`git submodule foreach --recursive git reset && git submodule foreach --recursive git clean -ffd && git submodule foreach --recursive git checkout .`);
+			// switches all submodules back to their tracked commit
+			await spawnPath(`git submodule update`);
+		}
+		
 		await spawnPath(`git reset && git clean -ffd && git checkout .`);
 	}
 
@@ -120,6 +136,18 @@ async function checkout({
 					...process.env,
 					LOCAL_BRANCH : desiredLocalBranch,
 					REMOTE_BRANCH : desiredRemoteBranch
+				}
+			});
+		}
+
+		if (await hasSubmodules(path) === true) {
+			// deinit the submodules and store the current modules directory under the branch name
+			await spawnPath(`git submodule deinit --all`);
+			await spawnPath(`mkdir -p .git/git-tools/modules`);
+			await spawnPath(`mv .git/modules .git/git-tools/modules/$BRANCH`, {
+				env : {
+					...process.env,
+					BRANCH : currentBranch
 				}
 			});
 		}
@@ -149,6 +177,25 @@ async function checkout({
 	}
 
 	await spawnPath(`git pull`);
+
+	if (await hasSubmodules(path) === true) {
+		if (await pathExists(`${path}/.git/git-tools/modules/${desiredLocalBranch}`)) {
+			// if we have an existing modules folder, but a stored variant, dump the existing
+			if (await pathExists(`${path}/.git/modules`)) {
+				await spawnPath(`rm -rf .git/modules`);
+			}
+
+			// restore the stored modules folder
+			await spawnPath(`mv .git/git-tools/modules/$BRANCH .git/modules`, {
+				env : {
+					...process.env,
+					BRANCH : desiredLocalBranch
+				}
+			});
+		}
+
+		await spawnPath(`git submodule sync && git submodule update`);
+	}
 }
 
 /**
@@ -156,13 +203,7 @@ async function checkout({
  * @param {string} path - Path to git repo without trailing /.
  */
 async function isGitRepo(path) {
-	try {
-		await fs.access(path + "/.git");
-	} catch (e) {
-		return false;
-	}
-
-	return true;
+	return pathExists(`${path}/.git`);
 }
 
 /**
@@ -249,6 +290,20 @@ async function isDirty(path) {
 	}
 }
 
+async function hasSubmodules(path) {
+	return pathExists(`${path}/.gitmodules`);
+}
+
+async function pathExists(path) {
+	try {
+		await fs.access(path);
+	} catch(e) {
+		return false;
+	}
+
+	return true;
+}
+
 exports.assertIsGit = assertIsGit;
 exports.checkout = checkout;
 exports.getBranch = getBranch;
@@ -257,3 +312,4 @@ exports.getState = getState;
 exports.getTrackingBranch = getTrackingBranch;
 exports.isDirty = isDirty;
 exports.isGitRepo = isGitRepo;
+exports.pathExists = pathExists;
