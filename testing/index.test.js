@@ -1,4 +1,6 @@
+//@ts-check
 const fs = require("fs").promises;
+/** @type {import("./assert")} */
 const assert = require("assert");
 const mochaLib = require("@simpleview/mochalib");
 const assertLib = require("@simpleview/assertlib");
@@ -173,7 +175,7 @@ describe(__filename, function() {
 
 		it("should reset the working copy if ahead", async function() {
 			this.timeout(10000);
-
+			
 			await checkout();
 			await fs.writeFile(`${checkoutFolder}/addedFile.txt`, "content");
 			child_process.execSync(`git add addedFile.txt && git commit -m 'new file'`, { cwd : checkoutFolder });
