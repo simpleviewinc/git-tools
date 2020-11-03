@@ -194,7 +194,7 @@ async function checkout({
 			});
 		}
 
-		await spawnPath(`git submodule sync && git submodule update`);
+		await spawnPath(`git submodule sync && git submodule update --init`);
 	}
 }
 
