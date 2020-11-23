@@ -31,6 +31,7 @@ function spawnP(command, args, options) {
  * @param {string} [args.github] - remote:branch syntax that github provides with their quick link in the UI.
  * @param {boolean} [args.silent] - Whether to perform the git mechanisms silently or stream to the parent process. Default false.
  * @param {boolean} [args.interactive] - Prompt the user before destructive changes are made to the working copy. Default false.
+ * @param {boolean} [args.preserveBranch] - Update and retain whatever the current branch checked out to.
  */
 async function checkout({
 	origin,
@@ -40,6 +41,7 @@ async function checkout({
 	github,
 	silent = false,
 	interactive = false,
+	preserveBranch = false
 }) {
 	if (path === undefined) {
 		throw new Error(`Must specify a path.`);
@@ -83,12 +85,17 @@ async function checkout({
 	}
 
 	const desiredRemoteBranch = `remotes/${remote}/${branch}`;
-	const desiredLocalBranch = remote === "origin" ? branch : `${remote}-${branch}`;
-	const desiredTracking = `${remote}/${branch}`;
+	let desiredLocalBranch = remote === "origin" ? branch : `${remote}-${branch}`;
+	let desiredTracking = `${remote}/${branch}`;
 	const name = origin.match(/\/(.*).git/)[1];
 
 	const currentTracking = await getTrackingBranch(path);
 	const currentBranch = await getBranch(path);
+
+	if (preserveBranch === true) {
+		desiredLocalBranch = currentBranch;
+		desiredTracking = currentTracking;
+	}
 
 	if (remote !== "origin") {
 		try {

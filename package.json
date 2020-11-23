@@ -6,6 +6,9 @@
 		"git"
 	],
 	"main": "src/index.js",
+	"bin": {
+		"git-tools": "./src/cli"
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/simpleviewinc/git-tools.git"

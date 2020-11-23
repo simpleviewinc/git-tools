@@ -114,6 +114,20 @@ describe(__filename, function() {
 						}
 					]
 				}
+			},
+			{
+				name : "checkout with preserveBranch",
+				args : {
+					checkoutArgs : { origin : testOrigin, path : checkoutFolder, silent : true, preserveBranch : true },
+					branch : "master",
+					trackingBranch : "origin/master",
+					branches : [
+						{
+							name : "master",
+							tracking : "origin/master"
+						}
+					]
+				}
 			}
 		];
 
@@ -243,6 +257,21 @@ describe(__filename, function() {
 			assert.strictEqual(state, "equal");
 		});
 
+		it("should preserveBranch", async function() {
+			this.timeout(10000);
+
+			await checkout({ branch : "develop" });
+			child_process.execSync(`git reset HEAD~1 && git clean -f`, { cwd : checkoutFolder });
+			const state1 = await gitTools.getState(checkoutFolder);
+			assert.strictEqual(state1, "behind");
+
+			await checkout({ preserveBranch : true });
+			const branch = await gitTools.getBranch(checkoutFolder);
+			assert.strictEqual(branch, "develop");
+			const state2 = await gitTools.getState(checkoutFolder);
+			assert.strictEqual(state2, "equal");
+		});
+
 		describe("submodules", function() {
 			this.timeout(20000);
 
@@ -307,16 +336,8 @@ describe(__filename, function() {
 			const state = await gitTools.getState(checkoutFolder);
 			assert.strictEqual(state, "equal");
 
-			const result = child_process.execSync("git log --oneline", { cwd : checkoutFolder }).toString().trim();
-			const commits = result.split("\n").map(val => {
-				const content = val.match(/(\w+) .*/);
-				return content[1];
-			});
-			// shift off the current commit
-			commits.shift();
-
 			// reset to the previous commit and ensure we are behind
-			child_process.execSync(`git reset ${commits[0]} && git clean -f`, { cwd : checkoutFolder });
+			child_process.execSync(`git reset HEAD~1 && git clean -f`, { cwd : checkoutFolder });
 			const state2 = await gitTools.getState(checkoutFolder);
 			assert.strictEqual(state2, "behind");
 
